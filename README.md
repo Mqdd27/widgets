@@ -3,7 +3,7 @@
 Widget [Scriptable](https://scriptable.app) for assigned task in Clickup. Compatible with MacOS, IpadOS, iOS
 
 ## Setup
-- Fill API token from clickup in [Clickup Settings (https://app.clickup.com/settings/app)].
+- Fill API token from clickup in [Clickup Settings](https://app.clickup.com/settings/app).
 - Paste the token (one time only).
 
 ## Preview
