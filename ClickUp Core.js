@@ -1,8 +1,6 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: pink; icon-glyph: cogs;
-// Dipakai semua script "ClickUp ...". Jangan dipilih sebagai widget.
-// Read-only: cuma GET ke ClickUp. Token ada di Keychain device, bukan di file ini (file ini sync ke iCloud).
 
 const TOKEN_KEY = "clickup_api_token";
 const API = "https://api.clickup.com/api/v2/";
@@ -11,7 +9,7 @@ const PRIORITY_ORDER = ["urgent", "high", "normal", "low"];
 const ROWS_ALL = { small: 0, medium: 4, large: 11, extraLarge: 11 };
 const ROWS_STATUS = { small: 4, medium: 5, large: 13, extraLarge: 13 };
 const REFRESH_MINUTES = 15;
-const CACHE_MINUTES = 5; // beberapa widget refresh barengan, cukup satu yang fetch
+const CACHE_MINUTES = 5;
 
 const WHITE = new Color("#ffffff");
 const DIM = new Color("#ffffff", 0.4);
@@ -30,16 +28,16 @@ function formatDate(date, format) {
 
 async function getToken() {
   if (Keychain.contains(TOKEN_KEY)) return Keychain.get(TOKEN_KEY);
-  if (config.runsInWidget) throw new Error("Buka Scriptable, run script ini sekali buat isi token");
+  if (config.runsInWidget) throw new Error("Open Scriptable, run this script once to input the token");
   const alert = new Alert();
   alert.title = "ClickUp API token";
-  alert.message = "Paste token pk_... (disimpan di Keychain device ini)";
+  alert.message = "Paste token pk_...";
   alert.addSecureTextField("pk_...");
-  alert.addAction("Simpan");
-  alert.addCancelAction("Batal");
-  if ((await alert.presentAlert()) === -1) throw new Error("Token belum diisi");
+  alert.addAction("Save");
+  alert.addCancelAction("Cancel");
+  if ((await alert.presentAlert()) === -1) throw new Error("Token is empty");
   const token = alert.textFieldValue(0).trim();
-  if (!token) throw new Error("Token belum diisi");
+  if (!token) throw new Error("Token is empty");
   Keychain.set(TOKEN_KEY, token);
   return token;
 }
@@ -49,7 +47,7 @@ async function api(path, token) {
   req.headers = { Authorization: token };
   const json = await req.loadJSON();
   const code = req.response.statusCode;
-  if (code === 401 && !config.runsInWidget) Keychain.remove(TOKEN_KEY); // run lagi = input ulang
+  if (code === 401 && !config.runsInWidget) Keychain.remove(TOKEN_KEY); // run agin = re-input token
   if (code !== 200) throw new Error(`ClickUp HTTP ${code}`);
   return json;
 }
@@ -57,7 +55,7 @@ async function api(path, token) {
 async function fetchTasks(token) {
   const { user } = await api("user", token);
   const { teams } = await api("team", token);
-  const team = teams[0].id; // ponytail: asumsi satu workspace, sama kayak clickup.el
+  const team = teams[0].id;
   const tasks = [];
   for (let page = 0; ; page++) {
     const r = await api(
@@ -71,7 +69,7 @@ async function fetchTasks(token) {
   return tasks;
 }
 
-// API task -> baris widget: buang yang selesai, urut status > prioritas > due date.
+// API task -> row widget: delete finished, sort by status > priority > due date.
 function prepare(tasks) {
   const rank = (list, value) => {
     const i = list.indexOf(value);
@@ -95,7 +93,7 @@ function prepare(tasks) {
     );
 }
 
-// Task + keterangan footer. Fetch gagal = pakai data terakhir, kalau ada.
+// Task + footer . Fetch fail = use last data, if any.
 async function load(forceFresh) {
   const cached = fm.fileExists(cachePath);
   const readCache = (label) => ({
@@ -110,7 +108,7 @@ async function load(forceFresh) {
     return { tasks, note: `update ${formatDate(new Date(), "HH:mm")}` };
   } catch (e) {
     if (!cached) throw e;
-    return readCache("gagal fetch, data");
+    return readCache("failed to fetch, data");
   }
 }
 
@@ -129,7 +127,7 @@ function groupByStatus(tasks) {
     g.count++;
     groups.set(t.status, g);
   }
-  return [...groups.values()]; // urutan ikut tasks yang sudah di-sort
+  return [...groups.values()]; // sort by STATUS_ORDER
 }
 
 function addHeader(widget, title, count, color) {
@@ -169,7 +167,7 @@ function addTaskRow(widget, task, showDue) {
   }
 }
 
-// status null = semua status.
+// status null = all status
 function render(tasks, status, family, note, scriptName) {
   const widget = new ListWidget();
   const gradient = new LinearGradient();
@@ -179,7 +177,6 @@ function render(tasks, status, family, note, scriptName) {
   widget.setPadding(14, 14, 12, 14);
   widget.spacing = 5;
   widget.refreshAfterDate = new Date(Date.now() + REFRESH_MINUTES * 60000);
-  // Tap area kosong = buka daftar lengkap. Tap baris task (medium/large) = buka task-nya.
   widget.url = `scriptable:///run?scriptName=${encodeURIComponent(scriptName)}`;
 
   const limit = (status ? ROWS_STATUS : ROWS_ALL)[family];
@@ -192,10 +189,10 @@ function render(tasks, status, family, note, scriptName) {
   }
   widget.addSpacer(2);
   for (const t of tasks.slice(0, limit)) addTaskRow(widget, t, family !== "small");
-  if (status && tasks.length === 0) addText(widget, "Kosong", FONT, DIM);
+  if (status && tasks.length === 0) addText(widget, "Empty", FONT, DIM);
   widget.addSpacer();
   const more = tasks.length - limit;
-  addText(widget, (limit && more > 0 ? `+${more} lagi · ` : "") + note, new Font("Menlo", 9), DIM);
+  addText(widget, (limit && more > 0 ? `+${more} left · ` : "") + note, new Font("Menlo", 9), DIM);
   return widget;
 }
 
@@ -209,7 +206,7 @@ function errorWidget(message) {
   return widget;
 }
 
-// Daftar lengkap yang bisa di-scroll, tampil kalau script dibuka di app.
+// list of all tasks
 async function showList(tasks, title, note) {
   const table = new UITable();
   table.showSeparators = true;
@@ -236,7 +233,7 @@ async function showList(tasks, title, note) {
   await table.present();
 }
 
-// Dipanggil script tipis per status. status null = semua.
+// called by widget or scriptable run. If widget, show widget. If scriptable, show list.
 async function run(status, scriptName) {
   const inWidget = config.runsInWidget;
   try {
@@ -245,7 +242,7 @@ async function run(status, scriptName) {
     if (inWidget) {
       Script.setWidget(render(shown, status, config.widgetFamily || "large", note, scriptName));
     } else {
-      await showList(shown, status ? status.toUpperCase() : "Semua task", note);
+      await showList(shown, status ? status.toUpperCase() : "All task", note);
     }
   } catch (e) {
     const widget = errorWidget(e.message);
