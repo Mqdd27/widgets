@@ -19,7 +19,7 @@ const DIM = new Color("#ffffff", 0.4);
 const GREEN = new Color("#51cf66");
 const YELLOW = new Color("#fcc419");
 const RED = new Color("#ff6b6b");
-const FONT = new Font("Menlo", 11);
+const FONT = new Font("Menlo", 10);
 const FONT_BOLD = new Font("Menlo-Bold", 12);
 
 async function getConfig() {
@@ -108,18 +108,20 @@ function render(stats, family) {
   gradient.colors = [new Color("#000000", 0.4), new Color("#000000", 0.6)];
   gradient.locations = [0, 1];
   widget.backgroundGradient = gradient;
-  widget.setPadding(14, 14, 12, 14);
-  widget.spacing = 6;
+  widget.setPadding(10, 14, 10, 14);
+  widget.spacing = 2;
   widget.refreshAfterDate = new Date(Date.now() + REFRESH_MINUTES * 60000);
 
-  addText(widget, "Server", FONT_BOLD, WHITE);
+  const df = new DateFormatter();
+  df.dateFormat = "HH:mm";
+  const header = widget.addStack();
+  header.centerAlignContent();
+  addText(header, "Server", FONT_BOLD, WHITE);
+  header.addSpacer();
+  addText(header, df.string(new Date()), new Font("Menlo", 9), DIM);
   widget.addSpacer(2);
   const barWidth = family === "small" ? 0 : 16;
   for (const label of Object.keys(QUERIES)) addStatRow(widget, label, stats[label], barWidth);
-  widget.addSpacer();
-  const df = new DateFormatter();
-  df.dateFormat = "HH:mm";
-  addText(widget, `update ${df.string(new Date())}`, new Font("Menlo", 9), DIM);
   return widget;
 }
 
